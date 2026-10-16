@@ -1,0 +1,45 @@
+name: 문해력 초안 생성
+
+on:
+  workflow_dispatch:
+  schedule:
+    # 한국 시간(KST) 매일 오전 6시 실행 (UTC 기준 21시)
+    - cron: '0 21 * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: literacy-feed
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          
+      - name: 초안 생성
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          NEWS_RSS_URL: ${{ vars.NEWS_RSS_URL }}
+          NEWS_CATEGORY: ${{ vars.NEWS_CATEGORY }}
+        run: python build_literacy.py
+        
+      - name: 결과 보관
+        if: always()
+        run: |
+          if [ -f news-feed.json ]; then
+            git config user.name "문해력 자료 자동화"
+            git config user.email "literacy-bot@users.noreply.github.com"
+            git add news-feed.json
+            git diff --cached --quiet || git commit -m "문해력 초안 추가"
+            git push
+          fi
